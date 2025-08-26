@@ -1,0 +1,23 @@
+{
+  "name": "faucet-management-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for Testnet Faucet Management System",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.js",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:mumbai": "hardhat run scripts/deploy.js --network mumbai",
+    "deploy:bsc": "hardhat run scripts/deploy.js --network bscTestnet",
+    "verify": "hardhat run scripts/verify.js",
+    "verify:sepolia": "hardhat run scripts/verify.js --network sepolia",
+    "interact": "hardhat run scripts/interact.js",
+    "interact:sepolia": "hardhat run scripts/interact.js --network sepolia",
+    "status": "hardhat run scripts/interact.js"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "hardhat": "^2.19.0"
+  }
+}

@@ -1,0 +1,118 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  address   String?  @unique // Primary wallet address
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  wallets   UserWallet[]
+  requests  FaucetRequest[]
+  donations Donation[]
+  badges    ContributorBadge[]
+  
+  @@map("users")
+}
+
+model UserWallet {
+  id       String  @id @default(cuid())
+  userId   String
+  chain    String  // ethereum, polygon, bsc, arbitrum, etc.
+  address  String
+  isActive Boolean @default(true)
+  balance  String  @default("0") // Cached balance
+  lastBalanceCheck DateTime?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, chain])
+  @@map("user_wallets")
+}
+
+model FaucetRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  chain       String   // Chain identifier
+  token       String   // Token symbol (ETH, MATIC, BNB, etc.)
+  amount      String   // Amount requested
+  status      String   // SUCCESS, FAILED, PENDING, PROCESSING
+  source      String   // OFFICIAL_FAUCET, COMMUNITY_POOL
+  txHash      String?  // Transaction hash if successful
+  errorReason String?  // Error message if failed
+  requestedAt DateTime @default(now())
+  completedAt DateTime?
+  cooldownUntil DateTime? // When user can request again
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("faucet_requests")
+}
+
+model Donation {
+  id          String   @id @default(cuid())
+  userId      String
+  chain       String   // Chain where donation was made
+  token       String   // Token symbol
+  amount      String   // Donated amount
+  txHash      String   @unique // Transaction hash
+  status      String   // CONFIRMED, PENDING, FAILED
+  blockNumber Int?     // Block number of confirmation
+  donatedAt   DateTime @default(now())
+  confirmedAt DateTime?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("donations")
+}
+
+model FaucetConfig {
+  id           String @id @default(cuid())
+  chain        String @unique // Chain identifier
+  name         String // Display name
+  token        String // Native token symbol
+  rpcUrl       String // RPC endpoint
+  faucetUrl    String? // Official faucet URL
+  isActive     Boolean @default(true)
+  cooldownHours Int    @default(24) // Hours between requests
+  maxAmount    String  @default("0.1") // Max amount per request
+  minBalance   String  @default("0.01") // Min balance threshold
+  
+  @@map("faucet_configs")
+}
+
+model DonationPool {
+  id          String @id @default(cuid())
+  chain       String @unique
+  token       String
+  totalAmount String @default("0")
+  available   String @default("0")
+  distributed String @default("0")
+  updatedAt   DateTime @updatedAt
+  
+  @@map("donation_pools")
+}
+
+model ContributorBadge {
+  id          String @id @default(cuid())
+  userId      String
+  tokenId     Int    @unique // NFT token ID
+  badgeLevel  String // BRONZE, SILVER, GOLD, DIAMOND
+  totalDonated String
+  mintedAt    DateTime
+  txHash      String @unique // Minting transaction hash
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("contributor_badges")
+}
