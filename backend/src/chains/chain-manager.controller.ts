@@ -10,6 +10,7 @@ import {
   Query,
   ValidationPipe,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { ChainManager } from './chain-manager.service';
@@ -36,19 +37,22 @@ import { CooldownInfoDto, ContributionLevelDto, PoolStatisticsDto } from './dto/
 @ApiTags('Chain Management')
 @Controller('chains')
 export class ChainManagerController {
+  private readonly logger = new Logger(ChainManagerController.name);
+
   constructor(
     private readonly chainManager: ChainManager,
     private readonly chainRegistry: ChainRegistryService,
   ) {}
 
   @Get('status')
-  @ApiOperation({ summary: 'Get all chains status' })
+  @ApiOperation({ summary: 'Get all chains status and statistics' })
   @ApiResponse({ status: 200, description: 'Chains status retrieved', type: AllChainsStatusDto })
   async getAllChainsStatus(): Promise<AllChainsStatusDto> {
-    const statuses = await this.chainManager.getPoolStatuses();
-    const chains = Object.entries(statuses).map(([chainId, status]) => ({
+    const statistics = await this.chainManager.getChainStatistics();
+    const chains = Object.entries(statistics).map(([chainId, stats]) => ({
       chainId,
-      ...status,
+      ...(stats as any),
+      isActive: !(stats as any)?.error,
     }));
 
     return {
@@ -60,33 +64,33 @@ export class ChainManagerController {
   }
 
   @Get('status/:chainId')
-  @ApiOperation({ summary: 'Get specific chain status' })
+  @ApiOperation({ summary: 'Get specific chain status and statistics' })
   @ApiParam({ name: 'chainId', description: 'Chain identifier' })
   @ApiResponse({ status: 200, description: 'Chain status retrieved', type: ChainStatusDto })
   async getChainStatus(@Param('chainId') chainId: string): Promise<ChainStatusDto> {
-    const statuses = await this.chainManager.getPoolStatuses();
-    const status = statuses[chainId];
+    const statistics = await this.chainManager.getChainStatistics(chainId);
     
-    if (!status) {
+    if (!statistics) {
       throw new Error(`Chain ${chainId} not found`);
     }
 
     return {
       chainId,
-      ...status,
+      ...(statistics as any),
+      isActive: !(statistics as any)?.error,
     };
   }
 
   @Get('supported')
-  @ApiOperation({ summary: 'Get list of supported chains' })
+  @ApiOperation({ summary: 'Get list of supported chains with configurations' })
   @ApiResponse({ status: 200, description: 'Supported chains list' })
   async getSupportedChains() {
     const chains = this.chainManager.getSupportedChains();
-    const types = this.chainManager.getChainTypes();
+    const configs = this.chainManager.getAllChainConfigs();
     
     return {
       chains,
-      types,
+      configs,
       count: chains.length,
     };
   }
@@ -129,13 +133,13 @@ export class ChainManagerController {
   @ApiOperation({ summary: 'Get donation history across all chains' })
   @ApiResponse({ status: 200, description: 'Donation history retrieved' })
   async getAllDonations(@Query() query: DonationHistoryQueryDto) {
-    const donations = await this.chainManager.getAllDonations();
+    const donations = await this.chainManager.getAllRecentActivity(100);
     
     // 필터링 로직
     let filtered = donations;
     
     if (query.chain) {
-      filtered = filtered.filter(d => d.chain === query.chain);
+      filtered = filtered.filter(d => d.chainId === query.chain);
     }
     
     if (query.donor) {
@@ -171,41 +175,34 @@ export class ChainManagerController {
   }
 
   @Post('donations/process')
-  @ApiOperation({ summary: 'Process a donation transaction' })
+  @ApiOperation({ summary: 'Process a donation transaction (DEPRECATED)' })
   @ApiResponse({ status: 201, description: 'Donation processed successfully' })
   async processDonation(@Body(ValidationPipe) processDonationDto: ProcessDonationDto) {
     const { donor, chain, amount, txHash, message } = processDonationDto;
     
-    const module = this.chainManager.getChainModule(chain);
-    if (!module) {
-      throw new Error(`Chain ${chain} not supported`);
-    }
-
-    const success = await module.processDonation(donor, amount, txHash);
+    // 이제 프론트엔드에서 직접 컨트랙트를 호출하므로 단순 로깅만
+    this.logger.log(`📝 Donation recorded: ${amount} on ${chain} from ${donor}`);
     
     return {
-      success,
+      success: true,
       chain,
       donor,
       amount,
       txHash,
       message,
       processedAt: new Date(),
+      note: 'Donation should be processed directly by smart contract',
     };
   }
 
   @Post('distribute')
-  @ApiOperation({ summary: 'Distribute tokens to recipient' })
-  @ApiResponse({ status: 201, description: 'Tokens distributed successfully' })
+  @ApiOperation({ summary: 'Request token distribution (DEPRECATED)' })
+  @ApiResponse({ status: 201, description: 'Distribution request logged' })
   async distributeTokens(@Body(ValidationPipe) distributeDto: DistributeTokensDto) {
     const { recipient, chain, amount, reason } = distributeDto;
     
-    const module = this.chainManager.getChainModule(chain);
-    if (!module) {
-      throw new Error(`Chain ${chain} not supported`);
-    }
-
-    const txHash = await module.distributeTokens(recipient, amount, reason);
+    // 백엔드는 요청만 로깅, 실제 분배는 프론트엔드에서 직접 컨트랙트 호출
+    this.logger.log(`📝 Distribution request: ${amount} to ${recipient} on ${chain}`);
     
     return {
       success: true,
@@ -213,53 +210,34 @@ export class ChainManagerController {
       recipient,
       amount,
       reason,
-      txHash,
+      txHash: `request_${chain}_${Date.now()}`,
       distributedAt: new Date(),
+      note: 'User should call smart contract directly from frontend',
     };
   }
 
   @Post('distribute/batch')
-  @ApiOperation({ summary: 'Batch distribute tokens on single chain' })
-  @ApiResponse({ status: 201, description: 'Batch distribution completed' })
+  @ApiOperation({ summary: 'Batch distribute tokens (DEPRECATED)' })
+  @ApiResponse({ status: 201, description: 'Batch distribution request logged' })
   async batchDistribute(@Body(ValidationPipe) batchDto: BatchDistributeDto) {
     const { chain, distributions, batchReason } = batchDto;
     
-    const module = this.chainManager.getChainModule(chain);
-    if (!module) {
-      throw new Error(`Chain ${chain} not supported`);
-    }
+    this.logger.log(`📝 Batch distribution request on ${chain}: ${distributions.length} recipients`);
 
-    const results = [];
-    
-    for (const dist of distributions) {
-      try {
-        const txHash = await module.distributeTokens(
-          dist.recipient,
-          dist.amount,
-          dist.reason || batchReason || 'Batch distribution'
-        );
-        
-        results.push({
-          recipient: dist.recipient,
-          amount: dist.amount,
-          success: true,
-          txHash,
-        });
-      } catch (error) {
-        results.push({
-          recipient: dist.recipient,
-          amount: dist.amount,
-          success: false,
-          error: error.message,
-        });
-      }
-    }
+    const results = distributions.map(dist => ({
+      recipient: dist.recipient,
+      amount: dist.amount,
+      success: true,
+      txHash: `request_${chain}_${Date.now()}`,
+      note: 'User should call smart contract directly',
+    }));
     
     return {
       chain,
       batchReason,
       results,
       distributedAt: new Date(),
+      note: 'Batch distribution should be handled by smart contract directly',
     };
   }
 
@@ -276,22 +254,18 @@ export class ChainManagerController {
   @ApiParam({ name: 'chainId', description: 'Chain identifier' })
   @ApiResponse({ status: 200, description: 'Chain statistics', type: ChainStatsDto })
   async getChainStats(@Param('chainId') chainId: string): Promise<ChainStatsDto> {
-    const module = this.chainManager.getChainModule(chainId);
-    if (!module) {
-      throw new Error(`Chain ${chainId} not found`);
-    }
-
-    const donations = await module.getDonationHistory(1000);
-    const availableBalance = await module.getAvailableBalance();
+    const statistics = await this.chainManager.getChainStatistics(chainId);
+    const recentActivity = await this.chainManager.getAllRecentActivity(50);
     
-    const totalAmount = donations.reduce((sum, d) => sum + parseFloat(d.amount), 0).toString();
-    const uniqueDonors = new Set(donations.map(d => d.donor)).size;
+    const chainActivity = recentActivity.filter(activity => activity.chainId === chainId);
+    const uniqueDonors = new Set(chainActivity.map(d => d.donor)).size;
+    const totalAmount = chainActivity.reduce((sum, d) => sum + parseFloat(d.amount), 0).toString();
     
     return {
-      totalDonations: donations.length,
+      totalDonations: chainActivity.length,
       totalAmount,
-      totalDistributed: '0', // 구현 필요
-      availableBalance,
+      totalDistributed: statistics?.statistics?.totalClaimed || '0',
+      availableBalance: statistics?.statistics?.currentBalance || '0',
       donorCount: uniqueDonors,
     };
   }
@@ -305,22 +279,8 @@ export class ChainManagerController {
   async getCooldownInfo(
     @Param('chainId') chainId: string,
     @Param('userAddress') userAddress: string,
-  ): Promise<CooldownInfoDto> {
-    const module = this.chainManager.getChainModule(chainId);
-    if (!module) {
-      throw new Error(`Chain ${chainId} not supported`);
-    }
-
-    // 체인 모듈에 getCooldownInfo 메서드가 있는지 확인
-    if ('getCooldownInfo' in module && typeof module.getCooldownInfo === 'function') {
-      return await (module as any).getCooldownInfo(userAddress);
-    }
-
-    // 기본값 반환
-    return {
-      canClaim: false,
-      remainingTime: 86400000, // 24시간
-    };
+  ) {
+    return await this.chainManager.checkFaucetCooldown(chainId, userAddress);
   }
 
   // 🏆 NEW: 기여도 조회 APIs  
@@ -332,22 +292,8 @@ export class ChainManagerController {
   async getContributionLevel(
     @Param('chainId') chainId: string,
     @Param('userAddress') userAddress: string,
-  ): Promise<ContributionLevelDto> {
-    const module = this.chainManager.getChainModule(chainId);
-    if (!module) {
-      throw new Error(`Chain ${chainId} not supported`);
-    }
-
-    if ('getContributionLevel' in module && typeof module.getContributionLevel === 'function') {
-      return await (module as any).getContributionLevel(userAddress);
-    }
-
-    return {
-      level: 0,
-      levelName: 'None', 
-      totalDonated: '0',
-      nextLevelRequirement: '0.1'
-    };
+  ) {
+    return await this.chainManager.getUserContribution(chainId, userAddress);
   }
 
   // 📊 NEW: 풀 통계 APIs
@@ -357,17 +303,9 @@ export class ChainManagerController {
   @ApiResponse({ type: PoolStatisticsDto })
   async getPoolStatistics(
     @Param('chainId') chainId: string,
-  ): Promise<PoolStatisticsDto> {
-    const module = this.chainManager.getChainModule(chainId);
-    if (!module) {
-      throw new Error(`Chain ${chainId} not supported`);
-    }
-
-    if ('getPoolStatistics' in module && typeof module.getPoolStatistics === 'function') {
-      return await (module as any).getPoolStatistics();
-    }
-
-    return {
+  ) {
+    const statistics = await this.chainManager.getChainStatistics(chainId);
+    return statistics?.statistics || {
       currentBalance: '0',
       totalDonations: '0',
       totalClaimed: '0',
@@ -384,18 +322,16 @@ export class ChainManagerController {
     @Param('userAddress') userAddress: string,
   ) {
     const chains = this.chainManager.getSupportedChains();
-    const cooldowns: Record<string, CooldownInfoDto> = {};
+    const cooldowns: Record<string, any> = {};
 
     for (const chainId of chains) {
       try {
-        const module = this.chainManager.getChainModule(chainId);
-        if (module && 'getCooldownInfo' in module) {
-          cooldowns[chainId] = await (module as any).getCooldownInfo(userAddress);
-        }
+        cooldowns[chainId] = await this.chainManager.checkFaucetCooldown(chainId, userAddress);
       } catch (error) {
         cooldowns[chainId] = {
           canClaim: false,
           remainingTime: 86400000,
+          error: error.message,
         };
       }
     }
@@ -415,24 +351,22 @@ export class ChainManagerController {
     @Param('userAddress') userAddress: string,
   ) {
     const chains = this.chainManager.getSupportedChains();
-    const contributions: Record<string, ContributionLevelDto> = {};
+    const contributions: Record<string, any> = {};
     let totalLevel = 0;
     let totalDonated = 0;
 
     for (const chainId of chains) {
       try {
-        const module = this.chainManager.getChainModule(chainId);
-        if (module && 'getContributionLevel' in module) {
-          const contribution = await (module as any).getContributionLevel(userAddress);
-          contributions[chainId] = contribution;
-          totalLevel = Math.max(totalLevel, contribution.level);
-          totalDonated += parseFloat(contribution.totalDonated);
-        }
+        const contribution = await this.chainManager.getUserContribution(chainId, userAddress);
+        contributions[chainId] = contribution;
+        totalLevel = Math.max(totalLevel, contribution.level);
+        totalDonated += parseFloat(contribution.totalDonated || '0');
       } catch (error) {
         contributions[chainId] = {
           level: 0,
           levelName: 'None',
           totalDonated: '0',
+          error: error.message,
         };
       }
     }
@@ -452,5 +386,24 @@ export class ChainManagerController {
       },
       checkedAt: new Date(),
     };
+  }
+
+  // 📜 NEW: 모든 체인의 최근 활동 조회
+  @Get('recent-activity')
+  @ApiOperation({ summary: '모든 체인에서 최근 활동 내역 조회' })
+  @ApiResponse({ status: 200, description: 'Recent activity across all chains' })
+  async getRecentActivity(@Query('limit') limit: number = 20) {
+    return await this.chainManager.getAllRecentActivity(limit);
+  }
+
+  // 🏆 NEW: 체인별 상위 기부자 랭킹
+  @Get(':chainId/rankings')
+  @ApiOperation({ summary: '특정 체인의 상위 기부자 랭킹 조회' })
+  @ApiParam({ name: 'chainId', description: '체인 ID' })
+  async getChainRankings(
+    @Param('chainId') chainId: string,
+    @Query('limit') limit: number = 10,
+  ) {
+    return await this.chainManager.getUserRanking(chainId, limit);
   }
 }

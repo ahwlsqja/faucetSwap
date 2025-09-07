@@ -1,185 +1,226 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BaseChainAdapter } from './interfaces/base-chain.interface';
-
-// 새로운 체인 타입 정의
-export interface ChainModule {
-  chainId: string;
-  chainType: 'evm' | 'sui' | 'solana' | 'near' | 'cosmos' | 'cardano';
-  name: string;
-  symbol: string;
-  
-  // 풀 관리
-  deployDonationPool(): Promise<string>;
-  getDonationPoolAddress(): string;
-  
-  // 기부 관리
-  processDonation(donor: string, amount: string, txHash: string): Promise<boolean>;
-  getDonationHistory(limit?: number): Promise<DonationRecord[]>;
-  
-  // 분배 관리
-  distributeTokens(recipient: string, amount: string, reason: string): Promise<string>;
-  getAvailableBalance(): Promise<string>;
-}
-
-export interface DonationRecord {
-  donor: string;
-  amount: string;
-  timestamp: Date;
-  txHash: string;
-  chain: string;
-}
+import { EVMChainService } from './services/evm-chain.service';
+import { SuiChainService } from './services/sui-chain.service';
 
 @Injectable()
 export class ChainManager {
   private readonly logger = new Logger(ChainManager.name);
-  private modules: Map<string, ChainModule> = new Map();
 
-  // 체인 모듈 등록 (플러그인 방식)
-  registerChain(chainId: string, module: ChainModule) {
-    this.modules.set(chainId, module);
-    this.logger.log(`✅ Chain module registered: ${chainId} (${module.chainType})`);
-  }
+  constructor(
+    private readonly evmChainService: EVMChainService,
+    private readonly suiChainService: SuiChainService,
+  ) {}
 
-  // 체인 모듈 제거
-  unregisterChain(chainId: string) {
-    if (this.modules.has(chainId)) {
-      this.modules.delete(chainId);
-      this.logger.log(`❌ Chain module unregistered: ${chainId}`);
-    }
-  }
+  // 지원하는 체인 설정 (stateless - 환경변수 기반)
+  private readonly supportedChains = {
+    ethereum: { 
+      type: 'evm', 
+      name: 'Ethereum Sepolia', 
+      symbol: 'ETH', 
+      explorer: 'https://sepolia.etherscan.io',
+      faucetUrl: 'https://sepoliafaucet.com',
+    },
+    polygon: { 
+      type: 'evm', 
+      name: 'Polygon Mumbai', 
+      symbol: 'MATIC',
+      explorer: 'https://mumbai.polygonscan.com',
+      faucetUrl: 'https://faucet.polygon.technology',
+    },
+    sui: { 
+      type: 'sui', 
+      name: 'Sui Testnet', 
+      symbol: 'SUI',
+      explorer: 'https://suiexplorer.com',
+      faucetUrl: 'https://docs.sui.io/testnet',
+    },
+  };
 
-  // 지원 체인 목록
+  // 지원 체인 목록 (stateless)
   getSupportedChains(): string[] {
-    return Array.from(this.modules.keys());
+    return Object.keys(this.supportedChains);
   }
 
-  // 체인별 타입 조회
-  getChainTypes(): Record<string, string> {
-    const types: Record<string, string> = {};
-    for (const [chainId, module] of this.modules) {
-      types[chainId] = module.chainType;
-    }
-    return types;
+  // 체인별 설정 조회 (stateless)
+  getChainConfig(chainId: string) {
+    return this.supportedChains[chainId] || null;
   }
 
-  // 특정 체인 모듈 조회
-  getChainModule(chainId: string): ChainModule | undefined {
-    return this.modules.get(chainId);
+  // 모든 체인 설정 조회 (stateless)
+  getAllChainConfigs() {
+    return this.supportedChains;
   }
 
-  // 모든 체인에서 기부 내역 수집
-  async getAllDonations(): Promise<DonationRecord[]> {
-    const allDonations: DonationRecord[] = [];
-    
-    for (const [chainId, module] of this.modules) {
-      try {
-        const donations = await module.getDonationHistory(50);
-        allDonations.push(...donations);
-      } catch (error) {
-        this.logger.error(`Failed to get donations from ${chainId}:`, error);
-      }
-    }
-
-    // 시간순 정렬
-    return allDonations.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }
-
-  // 체인별 풀 상태 조회
-  async getPoolStatuses() {
-    const statuses: Record<string, any> = {};
-    
-    for (const [chainId, module] of this.modules) {
-      try {
-        const balance = await module.getAvailableBalance();
-        const poolAddress = module.getDonationPoolAddress();
-        
-        statuses[chainId] = {
-          chainType: module.chainType,
-          name: module.name,
-          symbol: module.symbol,
-          availableBalance: balance,
-          poolAddress: poolAddress,
-          isActive: true,
-        };
-      } catch (error) {
-        this.logger.error(`Failed to get status for ${chainId}:`, error);
-        statuses[chainId] = {
-          chainType: module.chainType,
-          name: module.name,
-          symbol: module.symbol,
-          isActive: false,
-          error: error.message,
-        };
-      }
-    }
-
-    return statuses;
-  }
-
-  // 📊 통계용 - 백엔드는 이제 읽기 전용
-  async getChainStatistics() {
-    const stats: Record<string, any> = {};
-    
-    for (const [chainId, module] of this.modules) {
-      try {
-        const balance = await module.getAvailableBalance();
-        const donations = await module.getDonationHistory(100);
-        
-        stats[chainId] = {
-          chainType: module.chainType,
-          name: module.name,
-          symbol: module.symbol,
-          poolBalance: balance,
-          totalDonations: donations.length,
-          recentActivity: donations.slice(0, 5),
-          lastUpdated: new Date(),
-        };
-      } catch (error) {
-        this.logger.error(`Failed to get stats for ${chainId}:`, error);
-        stats[chainId] = { error: error.message };
-      }
-    }
-
-    return stats;
-  }
-
-  // 새로운 체인 추가시 초기화
-  async initializeNewChain(chainId: string, config: any) {
-    const module = this.modules.get(chainId);
-    if (!module) {
-      throw new Error(`Chain ${chainId} not registered`);
+  // 🕒 파우셋 쿨다운 검사 (핵심 백엔드 기능)
+  async checkFaucetCooldown(chainId: string, userAddress: string) {
+    const chainConfig = this.getChainConfig(chainId);
+    if (!chainConfig) {
+      throw new Error(`Unsupported chain: ${chainId}`);
     }
 
     try {
-      // 풀 컨트랙트 배포
-      const poolAddress = await module.deployDonationPool();
-      
-      this.logger.log(`🚀 Initialized ${chainId} with pool at ${poolAddress}`);
-      
-      return {
-        chainId,
-        poolAddress,
-        status: 'initialized',
-      };
+      if (chainConfig.type === 'evm') {
+        // EVM 체인 서비스 사용
+        const result = await this.evmChainService.checkCooldown(chainId, userAddress);
+        return {
+          ...result,
+          chainInfo: chainConfig,
+        };
+      } else if (chainConfig.type === 'sui') {
+        // Sui 체인 서비스 사용
+        const result = await this.suiChainService.checkCooldown(userAddress);
+        return {
+          ...result,
+          chainInfo: chainConfig,
+        };
+      } else {
+        throw new Error(`Chain type ${chainConfig.type} not implemented`);
+      }
     } catch (error) {
-      this.logger.error(`Failed to initialize ${chainId}:`, error);
-      throw error;
+      this.logger.error(`Failed to check cooldown for ${chainId}:`, error);
+      return {
+        canClaim: false,
+        remainingTime: 86400000,
+        chainInfo: chainConfig,
+        error: error.message,
+      };
     }
   }
 
-  // 헬스 체크 (모든 체인 상태 확인)
+  // 📊 체인별 통계 조회 (핵심 백엔드 기능)
+  async getChainStatistics(chainId?: string) {
+    const chains = chainId ? [chainId] : this.getSupportedChains();
+    const stats: Record<string, any> = {};
+    
+    for (const chain of chains) {
+      const config = this.getChainConfig(chain);
+      if (!config) continue;
+
+      try {
+        let poolStats, recentActivity;
+        
+        if (config.type === 'evm') {
+          poolStats = await this.evmChainService.getPoolStatistics(chain);
+          recentActivity = await this.evmChainService.getRecentDonations(chain, 5);
+        } else if (config.type === 'sui') {
+          poolStats = await this.suiChainService.getPoolStatistics();
+          recentActivity = await this.suiChainService.getRecentDonations(5);
+        }
+        
+        stats[chain] = {
+          ...config,
+          statistics: poolStats,
+          recentActivity,
+          lastUpdated: new Date(),
+        };
+      } catch (error) {
+        this.logger.error(`Failed to get stats for ${chain}:`, error);
+        stats[chain] = {
+          ...config,
+          error: error.message,
+          lastUpdated: new Date(),
+        };
+      }
+    }
+
+    return chainId ? stats[chainId] : stats;
+  }
+
+  // 🔍 사용자 기여도 조회 (NFT 배지용)
+  async getUserContribution(chainId: string, userAddress: string) {
+    const config = this.getChainConfig(chainId);
+    if (!config) {
+      throw new Error(`Unsupported chain: ${chainId}`);
+    }
+
+    try {
+      if (config.type === 'evm') {
+        return await this.evmChainService.getContributionLevel(chainId, userAddress);
+      } else if (config.type === 'sui') {
+        return await this.suiChainService.getContributionLevel(userAddress);
+      } else {
+        throw new Error(`Chain type ${config.type} not implemented`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to get contribution for ${userAddress} on ${chainId}:`, error);
+      return {
+        level: 0,
+        levelName: 'None',
+        totalDonated: '0',
+        nextLevelRequirement: '0.1',
+        error: error.message,
+      };
+    }
+  }
+
+  // 🏆 사용자 랭킹 조회 (추후 구현 - 복잡한 로직 필요)
+  async getUserRanking(chainId: string, limit: number = 10) {
+    const config = this.getChainConfig(chainId);
+    if (!config) {
+      throw new Error(`Unsupported chain: ${chainId}`);
+    }
+
+    try {
+      // TODO: 실제 구현시 모든 기부자 데이터를 조회해서 정렬해야 함
+      // 현재는 최근 기부 내역으로 대체
+      if (config.type === 'evm') {
+        const recentDonations = await this.evmChainService.getRecentDonations(chainId, limit);
+        return recentDonations.map((donation, index) => ({
+          rank: index + 1,
+          address: donation.donor,
+          totalDonated: donation.amount,
+          lastDonation: donation.timestamp,
+        }));
+      } else if (config.type === 'sui') {
+        const recentDonations = await this.suiChainService.getRecentDonations(limit);
+        return recentDonations.map((donation, index) => ({
+          rank: index + 1,
+          address: donation.donor,
+          totalDonated: donation.amount,
+          lastDonation: donation.timestamp,
+        }));
+      }
+
+      return [];
+    } catch (error) {
+      this.logger.error(`Failed to get rankings for ${chainId}:`, error);
+      return [];
+    }
+  }
+
+  // ⚡ 헬스 체크 (모든 체인 상태 확인)
   async healthCheck() {
     const health: Record<string, any> = {};
+    const chains = this.getSupportedChains();
     
-    for (const [chainId, module] of this.modules) {
+    for (const chainId of chains) {
       try {
-        // 간단한 상태 확인 (잔액 조회)
-        const balance = await module.getAvailableBalance();
-        health[chainId] = {
-          status: 'healthy',
-          balance,
-          lastChecked: new Date(),
-        };
+        const config = this.getChainConfig(chainId);
+        
+        if (config.type === 'evm') {
+          const connectionInfo = await this.evmChainService.checkConnection(chainId);
+          health[chainId] = {
+            status: connectionInfo.connected ? 'healthy' : 'unhealthy',
+            ...connectionInfo,
+            config,
+            lastChecked: new Date(),
+          };
+        } else if (config.type === 'sui') {
+          const connectionInfo = await this.suiChainService.checkConnection();
+          health[chainId] = {
+            status: connectionInfo.connected ? 'healthy' : 'unhealthy',
+            ...connectionInfo,
+            config,
+            lastChecked: new Date(),
+          };
+        } else {
+          health[chainId] = {
+            status: 'unknown',
+            config,
+            lastChecked: new Date(),
+            note: 'Chain type not implemented',
+          };
+        }
       } catch (error) {
         health[chainId] = {
           status: 'unhealthy',
@@ -190,5 +231,41 @@ export class ChainManager {
     }
 
     return health;
+  }
+
+  // 📜 모든 체인에서 최근 활동 조회
+  async getAllRecentActivity(limit: number = 20) {
+    const allActivity = [];
+    const chains = this.getSupportedChains();
+    
+    for (const chainId of chains) {
+      try {
+        const config = this.getChainConfig(chainId);
+        let recentActivity = [];
+        
+        if (config.type === 'evm') {
+          recentActivity = await this.evmChainService.getRecentDonations(chainId, limit);
+        } else if (config.type === 'sui') {
+          recentActivity = await this.suiChainService.getRecentDonations(limit);
+        }
+        
+        // 체인 정보 추가
+        const activityWithChain = recentActivity.map(activity => ({
+          ...activity,
+          chainId,
+          chainName: config.name,
+          chainSymbol: config.symbol,
+        }));
+        
+        allActivity.push(...activityWithChain);
+      } catch (error) {
+        this.logger.error(`Failed to get activity for ${chainId}:`, error);
+      }
+    }
+    
+    // 시간순 정렬하고 제한
+    return allActivity
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, limit);
   }
 }

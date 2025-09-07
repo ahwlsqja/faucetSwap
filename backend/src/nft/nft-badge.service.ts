@@ -37,15 +37,12 @@ export class NFTBadgeService {
 
       for (const chainId of chains) {
         try {
-          const module = this.chainManager.getChainModule(chainId);
-          if (module && 'getContributionLevel' in module) {
-            const contribution = await (module as any).getContributionLevel(userAddress);
-            
-            if (contribution.level > 0) {
-              activeChains.push(chainId);
-              highestLevel = Math.max(highestLevel, contribution.level);
-              totalDonated += parseFloat(contribution.totalDonated);
-            }
+          const contribution = await this.chainManager.getUserContribution(chainId, userAddress);
+          
+          if (contribution.level > 0) {
+            activeChains.push(chainId);
+            highestLevel = Math.max(highestLevel, contribution.level);
+            totalDonated += parseFloat(contribution.totalDonated);
           }
         } catch (error) {
           this.logger.warn(`Failed to check ${chainId} contribution:`, error.message);
@@ -98,14 +95,11 @@ export class NFTBadgeService {
 
     for (const chainId of chains) {
       try {
-        const module = this.chainManager.getChainModule(chainId);
-        if (module && 'getContributionLevel' in module) {
-          const contribution = await (module as any).getContributionLevel(userAddress);
-          
-          if (contribution.level > 0) {
-            contributedChains.push(chainId);
-            totalAcrossChains += parseFloat(contribution.totalDonated);
-          }
+        const contribution = await this.chainManager.getUserContribution(chainId, userAddress);
+        
+        if (contribution.level > 0) {
+          contributedChains.push(chainId);
+          totalAcrossChains += parseFloat(contribution.totalDonated);
         }
       } catch (error) {
         this.logger.warn(`Failed to get ${chainId} contribution:`, error.message);
@@ -224,14 +218,9 @@ export class NFTBadgeService {
   // 🎯 특정 체인에서의 기여도 기반 배지 체크
   async getChainSpecificBadgeInfo(userAddress: string, chainId: string) {
     try {
-      const module = this.chainManager.getChainModule(chainId);
-      if (!module || !('getContributionLevel' in module)) {
-        throw new Error(`Chain ${chainId} not supported for badges`);
-      }
-
-      const contribution = await (module as any).getContributionLevel(userAddress);
-      const poolStats = 'getPoolStatistics' in module ? 
-        await (module as any).getPoolStatistics() : null;
+      const contribution = await this.chainManager.getUserContribution(chainId, userAddress);
+      const statistics = await this.chainManager.getChainStatistics(chainId);
+      const poolStats = statistics?.statistics || null;
 
       return {
         chainId,
