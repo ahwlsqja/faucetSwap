@@ -20,7 +20,6 @@ model User {
   wallets   UserWallet[]
   requests  FaucetRequest[]
   donations Donation[]
-  badges    ContributorBadge[]
   
   @@map("users")
 }
@@ -103,16 +102,3 @@ model DonationPool {
   @@map("donation_pools")
 }
 
-model ContributorBadge {
-  id          String @id @default(cuid())
-  userId      String
-  tokenId     Int    @unique // NFT token ID
-  badgeLevel  String // BRONZE, SILVER, GOLD, DIAMOND
-  totalDonated String
-  mintedAt    DateTime
-  txHash      String @unique // Minting transaction hash
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@map("contributor_badges")
-}

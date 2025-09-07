@@ -203,7 +203,7 @@ export class FaucetService {
     const contractAddresses = {
       ethereum: process.env.ETHEREUM_CONTRACT,
       polygon: process.env.POLYGON_CONTRACT,
-      sui: process.env.SUI_PACKAGE_ID,
+      bsc: process.env.BSC_CONTRACT,
     };
 
     return {

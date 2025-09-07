@@ -26,32 +26,12 @@ async function main() {
       minBalance: '0.01',
     },
     {
-      chain: 'sui',
-      name: 'Sui Testnet',
-      token: 'SUI',
-      rpcUrl: process.env.SUI_RPC_URL || 'https://fullnode.testnet.sui.io',
-      faucetUrl: 'https://docs.sui.io/testnet',
-      cooldownHours: 24, // Sui 공식 Discord 파우셋
-      maxAmount: '0.01', // 0.01 SUI per request
-      minBalance: '0.001',
-    },
-    {
       chain: 'bsc',
       name: 'BSC Testnet',
       token: 'BNB',
       rpcUrl: process.env.BSC_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545',
       faucetUrl: 'https://testnet.binance.org/faucet-smart',
       cooldownHours: 24, // 바이낸스 공식
-      maxAmount: '0.1',
-      minBalance: '0.01',
-    },
-    {
-      chain: 'arbitrum',
-      name: 'Arbitrum Sepolia',
-      token: 'ETH',
-      rpcUrl: process.env.ARBITRUM_RPC_URL || 'https://sepolia-rollup.arbitrum.io/rpc',
-      faucetUrl: 'https://bridge.arbitrum.io',
-      cooldownHours: 24, // 아비트럼 브릿지 파우셋
       maxAmount: '0.1',
       minBalance: '0.01',
     },

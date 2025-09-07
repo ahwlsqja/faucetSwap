@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EVMChainService } from './services/evm-chain.service';
-import { SuiChainService } from './services/sui-chain.service';
 
 @Injectable()
 export class ChainManager {
@@ -8,7 +7,6 @@ export class ChainManager {
 
   constructor(
     private readonly evmChainService: EVMChainService,
-    private readonly suiChainService: SuiChainService,
   ) {}
 
   // 지원하는 체인 설정 (stateless - 환경변수 기반)
@@ -27,12 +25,12 @@ export class ChainManager {
       explorer: 'https://mumbai.polygonscan.com',
       faucetUrl: 'https://faucet.polygon.technology',
     },
-    sui: { 
-      type: 'sui', 
-      name: 'Sui Testnet', 
-      symbol: 'SUI',
-      explorer: 'https://suiexplorer.com',
-      faucetUrl: 'https://docs.sui.io/testnet',
+    bsc: { 
+      type: 'evm', 
+      name: 'BSC Testnet', 
+      symbol: 'BNB',
+      explorer: 'https://testnet.bscscan.com',
+      faucetUrl: 'https://testnet.binance.org/faucet-smart',
     },
   };
 
@@ -66,13 +64,6 @@ export class ChainManager {
           ...result,
           chainInfo: chainConfig,
         };
-      } else if (chainConfig.type === 'sui') {
-        // Sui 체인 서비스 사용
-        const result = await this.suiChainService.checkCooldown(userAddress);
-        return {
-          ...result,
-          chainInfo: chainConfig,
-        };
       } else {
         throw new Error(`Chain type ${chainConfig.type} not implemented`);
       }
@@ -102,9 +93,6 @@ export class ChainManager {
         if (config.type === 'evm') {
           poolStats = await this.evmChainService.getPoolStatistics(chain);
           recentActivity = await this.evmChainService.getRecentDonations(chain, 5);
-        } else if (config.type === 'sui') {
-          poolStats = await this.suiChainService.getPoolStatistics();
-          recentActivity = await this.suiChainService.getRecentDonations(5);
         }
         
         stats[chain] = {
@@ -136,8 +124,6 @@ export class ChainManager {
     try {
       if (config.type === 'evm') {
         return await this.evmChainService.getContributionLevel(chainId, userAddress);
-      } else if (config.type === 'sui') {
-        return await this.suiChainService.getContributionLevel(userAddress);
       } else {
         throw new Error(`Chain type ${config.type} not implemented`);
       }
@@ -171,14 +157,6 @@ export class ChainManager {
           totalDonated: donation.amount,
           lastDonation: donation.timestamp,
         }));
-      } else if (config.type === 'sui') {
-        const recentDonations = await this.suiChainService.getRecentDonations(limit);
-        return recentDonations.map((donation, index) => ({
-          rank: index + 1,
-          address: donation.donor,
-          totalDonated: donation.amount,
-          lastDonation: donation.timestamp,
-        }));
       }
 
       return [];
@@ -199,14 +177,6 @@ export class ChainManager {
         
         if (config.type === 'evm') {
           const connectionInfo = await this.evmChainService.checkConnection(chainId);
-          health[chainId] = {
-            status: connectionInfo.connected ? 'healthy' : 'unhealthy',
-            ...connectionInfo,
-            config,
-            lastChecked: new Date(),
-          };
-        } else if (config.type === 'sui') {
-          const connectionInfo = await this.suiChainService.checkConnection();
           health[chainId] = {
             status: connectionInfo.connected ? 'healthy' : 'unhealthy',
             ...connectionInfo,
@@ -245,8 +215,6 @@ export class ChainManager {
         
         if (config.type === 'evm') {
           recentActivity = await this.evmChainService.getRecentDonations(chainId, limit);
-        } else if (config.type === 'sui') {
-          recentActivity = await this.suiChainService.getRecentDonations(limit);
         }
         
         // 체인 정보 추가
