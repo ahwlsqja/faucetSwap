@@ -13,10 +13,10 @@ export class EVMChainService {
       contractAddress: process.env.ETHEREUM_CONTRACT || '',
       chainId: 11155111, // Sepolia
     },
-    polygon: {
-      rpcUrl: process.env.POLYGON_RPC_URL || 'https://rpc-mumbai.maticvigil.com',
-      contractAddress: process.env.POLYGON_CONTRACT || '',
-      chainId: 80001, // Mumbai
+    bsc: {
+      rpcUrl: process.env.BSC_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545',
+      contractAddress: process.env.BSC_CONTRACT || '',
+      chainId: 97, // BSC Testnet
     },
   };
 

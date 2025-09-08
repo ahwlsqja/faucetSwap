@@ -89,7 +89,7 @@ export class FaucetController {
   @Get('cooldown/:address/:chain')
   @ApiOperation({ summary: 'Get detailed cooldown info for specific chain' })
   @ApiParam({ name: 'address', description: 'User wallet address' })
-  @ApiParam({ name: 'chain', description: 'Chain identifier (ethereum, polygon, bsc)' })
+  @ApiParam({ name: 'chain', description: 'Chain identifier (ethereum, sui, bsc)' })
   async getChainCooldown(
     @Param('address') address: string,
     @Param('chain') chain: string,

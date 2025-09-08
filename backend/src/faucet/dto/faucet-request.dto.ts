@@ -17,7 +17,7 @@ export class FaucetRequestDto {
   @ApiProperty({ 
     description: 'Chain identifier',
     example: 'ethereum',
-    enum: ['ethereum', 'polygon', 'bsc']
+    enum: ['ethereum', 'sui', 'bsc']
   })
   @IsString()
   chain: string;

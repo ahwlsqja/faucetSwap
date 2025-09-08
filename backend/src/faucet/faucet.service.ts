@@ -199,18 +199,55 @@ export class FaucetService {
   }
 
   private async getContractInfo(chain: string) {
-    // 체인별 컨트랙트 정보 반환 (환경변수에서 가져와야 함)
-    const contractAddresses = {
-      ethereum: process.env.ETHEREUM_CONTRACT,
-      polygon: process.env.POLYGON_CONTRACT,
-      bsc: process.env.BSC_CONTRACT,
-    };
+    // 체인별 컨트랙트 정보 반환
+    const chainInfo = this.chainManager.getChainConfig(chain);
+    
+    if (chainInfo?.type === 'evm') {
+      // EVM 체인: 컨트랙트 주소 + ABI
+      const contractAddress = chain === 'ethereum' 
+        ? process.env.ETHEREUM_CONTRACT 
+        : process.env.BSC_CONTRACT;
+        
+      return {
+        type: 'evm',
+        contractAddress,
+        method: 'requestFaucet',
+        abi: this.getAutoFaucetPoolABI(),
+        chainId: chainInfo.symbol === 'ETH' ? 11155111 : 97, // Sepolia : BSC Testnet
+      };
+    } else if (chainInfo?.type === 'sui') {
+      // Sui 체인: Package ID + 함수명
+      return {
+        type: 'sui',
+        packageId: process.env.SUI_PACKAGE_ID,
+        poolObjectId: process.env.SUI_POOL_OBJECT_ID,
+        moduleName: 'faucet_pool',
+        functionName: 'request_faucet',
+        network: 'testnet',
+      };
+    } else {
+      throw new Error(`Unsupported chain: ${chain}`);
+    }
+  }
 
-    return {
-      contractAddress: contractAddresses[chain],
-      method: 'requestFaucet',
-      abi: 'AutoFaucetPool', // 실제로는 전체 ABI 필요
-    };
+  // AutoFaucetPool ABI (실제 컨트랙트에서 필요한 함수들만)
+  private getAutoFaucetPoolABI() {
+    return [
+      // 사용자가 호출할 함수
+      'function requestFaucet() external',
+      'function donate(string calldata message) external payable',
+      
+      // 읽기 함수들 (프론트에서 상태 확인용)
+      'function canClaim(address user) external view returns (bool)',
+      'function getCooldownRemaining(address user) external view returns (uint256)',
+      'function getContributionLevel(address user) external view returns (uint8)',
+      'function faucetAmount() external view returns (uint256)',
+      'function getPoolStats() external view returns (uint256, uint256, uint256, uint256, uint256)',
+      
+      // 이벤트들
+      'event FaucetClaimed(address indexed user, uint256 amount)',
+      'event DonationReceived(address indexed donor, uint256 amount, string message)',
+    ];
   }
 
   // 통계 조회

@@ -21,7 +21,7 @@ contract AutoFaucetPool is ReentrancyGuard, Ownable {
     event FaucetClaimed(address indexed user, uint256 amount);
     event FaucetAmountUpdated(uint256 oldAmount, uint256 newAmount);
     
-    constructor() {}
+    constructor() Ownable(msg.sender) {}
     
     // 🎯 기부 (누구나 가능)
     function donate(string calldata message) external payable nonReentrant {

@@ -16,14 +16,14 @@ async function main() {
       minBalance: '0.001',
     },
     {
-      chain: 'polygon',
-      name: 'Polygon Mumbai',
-      token: 'MATIC',
-      rpcUrl: process.env.POLYGON_RPC_URL || 'https://rpc-mumbai.maticvigil.com',
-      faucetUrl: 'https://faucet.polygon.technology',
-      cooldownHours: 24, // 폴리곤 공식 파우셋
-      maxAmount: '0.5',  // MATIC 파우셋은 더 많이 줌
-      minBalance: '0.01',
+      chain: 'sui',
+      name: 'Sui Testnet',
+      token: 'SUI',
+      rpcUrl: process.env.SUI_RPC_URL || 'https://fullnode.testnet.sui.io:443',
+      faucetUrl: 'https://docs.sui.io/testnet',
+      cooldownHours: 24, // Sui 공식 Discord 파우셋
+      maxAmount: '0.01', // 0.01 SUI per request
+      minBalance: '0.001',
     },
     {
       chain: 'bsc',
