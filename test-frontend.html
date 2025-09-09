@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faucet Manager Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background: #0070f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0051cc;
+        }
+        .result {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            pre {
+                overflow-x: auto;
+            }
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .healthy { background: #d4edda; color: #155724; }
+        .unhealthy { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>🚰 Faucet Manager API Test</h1>
+    
+    <div class="container">
+        <h2>📊 System Status</h2>
+        <button onclick="checkHealth()">Check Chain Health</button>
+        <button onclick="getSupportedChains()">Get Supported Chains</button>
+        <div id="systemResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>🔍 Chain Tests</h2>
+        <button onclick="testEthereumPool()">Test Ethereum Pool</button>
+        <button onclick="testSuiPool()">Test Sui Pool</button>
+        <button onclick="testCooldown()">Test Cooldown (Your Address)</button>
+        <div id="chainResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>🔐 Authentication Test</h2>
+        <button onclick="getNonce()">Get Nonce</button>
+        <div id="authResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>🎯 Faucet Request Test (실제 지갑 연결 필요)</h2>
+        <p>⚠️ 이 기능은 실제 MetaMask/Sui Wallet 연결이 필요합니다.</p>
+        <button onclick="testFaucetRequest('ethereum')">Request Ethereum Faucet</button>
+        <button onclick="testFaucetRequest('sui')">Request Sui Faucet</button>
+        <div id="faucetResult" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+        
+        async function apiCall(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const data = await response.json();
+                return { success: response.ok, data, status: response.status };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        function displayResult(elementId, result) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+        }
+
+        async function checkHealth() {
+            const result = await apiCall('/chains/health');
+            displayResult('systemResult', result);
+        }
+
+        async function getSupportedChains() {
+            const result = await apiCall('/chains/supported');
+            displayResult('systemResult', result);
+        }
+
+        async function testEthereumPool() {
+            const result = await apiCall('/chains/ethereum/pool-statistics');
+            displayResult('chainResult', result);
+        }
+
+        async function testSuiPool() {
+            const result = await apiCall('/chains/sui/pool-statistics');
+            displayResult('chainResult', result);
+        }
+
+        async function testCooldown() {
+            // Sui 지갑 주소 (배포할 때 사용한 주소)
+            const suiAddress = '0x2c3dc44f39452ab44db72ffdf4acee24c7a9feeefd0de7ef058ff847f27834e4';
+            const result = await apiCall(`/faucet/cooldown/${suiAddress}?chain=sui`);
+            displayResult('chainResult', result);
+        }
+
+        async function getNonce() {
+            const result = await apiCall('/auth/nonce');
+            displayResult('authResult', result);
+        }
+
+        async function testFaucetRequest(chain) {
+            // 실제로는 지갑 연결이 필요하므로 Mock 요청
+            const mockRequest = {
+                chain: chain,
+                source: 'COMMUNITY_POOL'
+            };
+            
+            alert(`실제 Faucet 요청은 다음 단계가 필요합니다:\n1. ${chain === 'ethereum' ? 'MetaMask' : 'Sui Wallet'} 연결\n2. 지갑 서명으로 인증\n3. POST /faucet/request 호출\n\nMock 데이터로 Contract 정보만 확인:`);
+            
+            // Contract 정보만 확인
+            const result = await apiCall(`/chains/${chain}/pool-statistics`);
+            displayResult('faucetResult', result);
+        }
+
+        // 페이지 로드 시 기본 상태 확인
+        window.onload = function() {
+            checkHealth();
+        }
+    </script>
+</body>
+</html>

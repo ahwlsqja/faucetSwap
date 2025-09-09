@@ -10,8 +10,17 @@ const apiClient = axios.create({
   },
 });
 
+// Add auth token interceptor
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export function useApi() {
-  // User endpoints
+  // User endpoints (adjusted for backend compatibility)
   const createUser = async (userData: { email?: string; address: string }) => {
     const response = await apiClient.post('/users', userData);
     return response.data;
@@ -23,7 +32,6 @@ export function useApi() {
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 404) {
-        // User doesn't exist, create one
         return createUser({ address });
       }
       throw error;
@@ -45,29 +53,29 @@ export function useApi() {
     return response.data;
   };
 
-  // Faucet endpoints
-  const requestFaucet = async (requestData: { userId: string; chain: string; address: string }) => {
+  // Faucet endpoints (updated for backend compatibility)
+  const requestFaucet = async (requestData: { chain: string; source: 'OFFICIAL_FAUCET' | 'COMMUNITY_POOL' }) => {
     const response = await apiClient.post('/faucet/request', requestData);
     return response.data;
   };
 
-  const getFaucetStatus = async (userId: string) => {
-    const response = await apiClient.get(`/faucet/status/${userId}`);
+  const getCooldownStatus = async (address: string, chain?: string) => {
+    const response = await apiClient.get(`/faucet/cooldown/${address}${chain ? `?chain=${chain}` : ''}`);
     return response.data;
   };
 
-  const getFaucetHistory = async (userId: string, page = 1, limit = 20) => {
-    const response = await apiClient.get(`/faucet/history/${userId}?page=${page}&limit=${limit}`);
+  const getFaucetHistory = async (address: string, limit = 20) => {
+    const response = await apiClient.get(`/faucet/history/${address}?limit=${limit}`);
     return response.data;
   };
 
   const getFaucetStats = async () => {
-    const response = await apiClient.get('/faucet/stats');
+    const response = await apiClient.get('/faucet/statistics');
     return response.data;
   };
 
-  const refreshBalance = async (userId: string, chain: string) => {
-    const response = await apiClient.post(`/faucet/refresh-balance/${userId}/${chain}`);
+  const updateRequestStatus = async (requestId: string, status: string, txHash?: string) => {
+    const response = await apiClient.patch(`/faucet/request/${requestId}/status`, { status, txHash });
     return response.data;
   };
 
@@ -108,6 +116,22 @@ export function useApi() {
     return response.data;
   };
 
+  // Auth endpoints
+  const getNonce = async () => {
+    const response = await apiClient.get('/auth/nonce');
+    return response.data;
+  };
+
+  const login = async (loginData: { address: string; signature: string; message: string }) => {
+    const response = await apiClient.post('/auth/login', loginData);
+    return response.data;
+  };
+
+  const getProfile = async () => {
+    const response = await apiClient.get('/auth/profile');
+    return response.data;
+  };
+
   return {
     // User methods
     createUser,
@@ -118,10 +142,10 @@ export function useApi() {
     
     // Faucet methods
     requestFaucet,
-    getFaucetStatus,
+    getCooldownStatus,
     getFaucetHistory,
     getFaucetStats,
-    refreshBalance,
+    updateRequestStatus,
     
     // Donation methods
     createDonation,
@@ -130,5 +154,10 @@ export function useApi() {
     getDonationStats,
     getUserBadges,
     getLeaderboard,
+    
+    // Auth methods
+    getNonce,
+    login,
+    getProfile,
   };
 }

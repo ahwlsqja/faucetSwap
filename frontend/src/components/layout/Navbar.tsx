@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useWebSocket } from '@/components/providers/WebSocketProvider';
+import { useAuth } from '@/hooks/useAuth';
+import { useAccount } from 'wagmi';
+import { useSuiWallet } from '@/hooks/useSuiWallet';
 import {
   Bars3Icon,
   XMarkIcon,
@@ -13,6 +16,8 @@ import {
   TrophyIcon,
   HeartIcon,
   ChartBarIcon,
+  UserIcon,
+  ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline';
 import { WifiIcon } from '@heroicons/react/24/solid';
 import clsx from 'clsx';
@@ -29,6 +34,9 @@ export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { isConnected: isWsConnected } = useWebSocket();
+  const { user, isAuthenticated, isLoading, login, logout } = useAuth();
+  const { isConnected } = useAccount();
+  const { connected: suiConnected, connecting: suiConnecting, connect: connectSui, disconnect: disconnectSui, account: suiAccount } = useSuiWallet();
 
   return (
     <nav className="bg-white shadow-lg border-b border-gray-200">
@@ -83,8 +91,66 @@ export function Navbar() {
               </span>
             </div>
 
-            {/* Connect Button */}
+            {/* EVM Connect Button */}
             <ConnectButton />
+
+            {/* Sui Connect Button */}
+            {suiConnected ? (
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm text-blue-800">
+                    {suiAccount?.address.slice(0, 6)}...{suiAccount?.address.slice(-4)}
+                  </span>
+                </div>
+                <button
+                  onClick={disconnectSui}
+                  className="px-3 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                >
+                  Disconnect Sui
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={connectSui}
+                disabled={suiConnecting}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {suiConnecting ? 'Connecting...' : 'Connect Sui'}
+              </button>
+            )}
+
+            {/* Login/Profile Button */}
+            {(isConnected || suiConnected) && (
+              <div className="flex items-center space-x-2">
+                {isAuthenticated ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                      <UserIcon className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-800">
+                        {user?.address.slice(0, 6)}...{user?.address.slice(-4)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={logout}
+                      className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <ArrowRightOnRectangleIcon className="h-4 w-4" />
+                      <span className="hidden sm:block">Logout</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={login}
+                    disabled={isLoading}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <UserIcon className="h-4 w-4" />
+                    <span>{isLoading ? 'Signing...' : 'Sign In'}</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Mobile menu button */}
             <div className="md:hidden">
@@ -139,6 +205,82 @@ export function Navbar() {
                 {isWsConnected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
+
+            {/* Mobile Sui Status */}
+            {suiConnected && (
+              <div className="px-3 py-2 border-t border-gray-200 mt-2 pt-4">
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm text-blue-800">
+                      Sui: {suiAccount?.address.slice(0, 6)}...{suiAccount?.address.slice(-4)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      disconnectSui();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors w-full"
+                  >
+                    <span>Disconnect Sui</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!suiConnected && (
+              <div className="px-3 py-2 border-t border-gray-200 mt-2 pt-4">
+                <button
+                  onClick={() => {
+                    connectSui();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  disabled={suiConnecting}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors w-full"
+                >
+                  {suiConnecting ? 'Connecting...' : 'Connect Sui'}
+                </button>
+              </div>
+            )}
+
+            {/* Mobile Auth Status */}
+            {(isConnected || suiConnected) && (
+              <div className="px-3 py-2 border-t border-gray-200 mt-2 pt-4">
+                {isAuthenticated ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                      <UserIcon className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-800">
+                        {user?.address.slice(0, 6)}...{user?.address.slice(-4)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors w-full"
+                    >
+                      <ArrowRightOnRectangleIcon className="h-4 w-4" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      login();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    disabled={isLoading}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full"
+                  >
+                    <UserIcon className="h-4 w-4" />
+                    <span>{isLoading ? 'Signing...' : 'Sign In'}</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

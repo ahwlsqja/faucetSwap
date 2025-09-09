@@ -203,17 +203,15 @@ export class FaucetService {
     const chainInfo = this.chainManager.getChainConfig(chain);
     
     if (chainInfo?.type === 'evm') {
-      // EVM 체인: 컨트랙트 주소 + ABI
-      const contractAddress = chain === 'ethereum' 
-        ? process.env.ETHEREUM_CONTRACT 
-        : process.env.BSC_CONTRACT;
+      // EVM 체인: 컨트랙트 주소 + ABI (이더리움만 지원)
+      const contractAddress = process.env.ETHEREUM_CONTRACT;
         
       return {
         type: 'evm',
         contractAddress,
         method: 'requestFaucet',
         abi: this.getAutoFaucetPoolABI(),
-        chainId: chainInfo.symbol === 'ETH' ? 11155111 : 97, // Sepolia : BSC Testnet
+        chainId: 11155111, // Sepolia Testnet
       };
     } else if (chainInfo?.type === 'sui') {
       // Sui 체인: Package ID + 함수명

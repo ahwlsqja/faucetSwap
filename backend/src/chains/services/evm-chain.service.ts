@@ -6,17 +6,12 @@ export class EVMChainService {
   private readonly logger = new Logger(EVMChainService.name);
   private readonly providers: Map<string, ethers.JsonRpcProvider> = new Map();
   
-  // 체인별 설정
+  // 체인별 설정 (BSC 제거)
   private readonly chainConfigs = {
     ethereum: {
       rpcUrl: process.env.ETHEREUM_RPC_URL || 'https://sepolia.infura.io/v3/YOUR_KEY',
       contractAddress: process.env.ETHEREUM_CONTRACT || '',
       chainId: 11155111, // Sepolia
-    },
-    bsc: {
-      rpcUrl: process.env.BSC_RPC_URL || 'https://data-seed-prebsc-1-s1.binance.org:8545',
-      contractAddress: process.env.BSC_CONTRACT || '',
-      chainId: 97, // BSC Testnet
     },
   };
 

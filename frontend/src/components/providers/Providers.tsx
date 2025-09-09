@@ -5,6 +5,8 @@ import { WagmiProvider } from 'wagmi';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
 import { wagmiConfig } from '@/config/wagmi';
 import { WebSocketProvider } from './WebSocketProvider';
+import { AuthProvider } from '@/hooks/useAuth';
+import { SuiWalletProvider } from '@/hooks/useSuiWallet';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,9 +34,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
             learnMoreUrl: 'https://docs.testnet-faucet.com',
           }}
         >
-          <WebSocketProvider>
-            {children}
-          </WebSocketProvider>
+          <SuiWalletProvider>
+            <AuthProvider>
+              <WebSocketProvider>
+                {children}
+              </WebSocketProvider>
+            </AuthProvider>
+          </SuiWalletProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

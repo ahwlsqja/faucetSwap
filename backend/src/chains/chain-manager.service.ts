@@ -11,7 +11,7 @@ export class ChainManager {
     private readonly suiChainService: SuiChainService,
   ) {}
 
-  // 지원하는 체인 설정 (stateless - 환경변수 기반)
+  // 지원하는 체인 설정 (BSC 제거)
   private readonly supportedChains = {
     ethereum: { 
       type: 'evm', 
@@ -26,13 +26,6 @@ export class ChainManager {
       symbol: 'SUI',
       explorer: 'https://suiexplorer.com',
       faucetUrl: 'https://docs.sui.io/testnet',
-    },
-    bsc: { 
-      type: 'evm', 
-      name: 'BSC Testnet', 
-      symbol: 'BNB',
-      explorer: 'https://testnet.bscscan.com',
-      faucetUrl: 'https://testnet.binance.org/faucet-smart',
     },
   };
 

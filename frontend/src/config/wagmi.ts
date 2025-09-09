@@ -1,14 +1,11 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-import { sepolia, polygonMumbai, bscTestnet, arbitrumSepolia } from 'wagmi/chains';
+import { sepolia } from 'wagmi/chains';
 
 export const wagmiConfig = getDefaultConfig({
   appName: 'Testnet Faucet Manager',
   projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || 'your-wallet-connect-project-id',
   chains: [
     sepolia,
-    polygonMumbai,
-    bscTestnet,
-    arbitrumSepolia,
   ],
   ssr: true,
 });
@@ -25,33 +22,13 @@ export const supportedChains = [
     color: '#627EEA',
   },
   {
-    id: 'polygon',
-    name: 'Polygon Mumbai',
-    symbol: 'MATIC',
-    chainId: polygonMumbai.id,
-    rpcUrl: polygonMumbai.rpcUrls.default.http[0],
-    blockExplorer: polygonMumbai.blockExplorers?.default.url,
-    faucetUrl: 'https://faucet.polygon.technology',
-    color: '#8247E5',
-  },
-  {
-    id: 'bsc',
-    name: 'BSC Testnet',
-    symbol: 'BNB',
-    chainId: bscTestnet.id,
-    rpcUrl: bscTestnet.rpcUrls.default.http[0],
-    blockExplorer: bscTestnet.blockExplorers?.default.url,
-    faucetUrl: 'https://testnet.binance.org/faucet-smart',
-    color: '#F3BA2F',
-  },
-  {
-    id: 'arbitrum',
-    name: 'Arbitrum Sepolia',
-    symbol: 'ETH',
-    chainId: arbitrumSepolia.id,
-    rpcUrl: arbitrumSepolia.rpcUrls.default.http[0],
-    blockExplorer: arbitrumSepolia.blockExplorers?.default.url,
-    faucetUrl: 'https://bridge.arbitrum.io',
-    color: '#28A0F0',
+    id: 'sui',
+    name: 'Sui Testnet',
+    symbol: 'SUI',
+    chainId: 0, // Sui는 EVM이 아니므로 0
+    rpcUrl: 'https://fullnode.testnet.sui.io:443',
+    blockExplorer: 'https://suiexplorer.com',
+    faucetUrl: 'https://docs.sui.io/testnet',
+    color: '#4DA2FF',
   },
 ];
